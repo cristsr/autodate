@@ -1,0 +1,21 @@
+[package]
+name = "invoices-name"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tray-item = "0.9.0"
+notify = "6.1.1"
+chrono = "0.4.31"
+winapi = { version = "0.3", features = ["winuser", "wincon"] }
+
+[build-dependencies]
+embed-resource = "2.3"
+
+[profile.dev.package.metadata.win]
+subsystem = "console"
+
+[profile.release.package.metadata.win]
+subsystem = "windows"
