@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use notify::event::{CreateKind, ModifyKind, RenameMode};
 use notify::EventKind::{Create, Modify};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
