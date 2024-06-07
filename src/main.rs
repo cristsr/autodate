@@ -1,61 +1,156 @@
+use notify::event::{CreateKind, ModifyKind, RenameMode};
+use notify::EventKind::{Create, Modify};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use std::fmt::Error;
 use std::path::Path;
-use std::sync::mpsc;
-use std::thread;
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
-use notify::{Event, RecursiveMode, Watcher};
-use notify::event::CreateKind;
-use notify::EventKind::Create;
+use std::{process, thread};
 use tray_item::{IconSource, TrayItem};
-use winapi::um::wincon::{ATTACH_PARENT_PROCESS, AttachConsole, FreeConsole};
 
-enum Message {
-    Quit,
-    Green,
-    Red,
+type TrayChanel = (
+    mpsc::Sender<&'static str>,
+    Arc<Mutex<mpsc::Receiver<&'static str>>>,
+);
+
+type WatcherChanel = (
+    mpsc::Sender<notify::Result<Event>>,
+    Arc<Mutex<mpsc::Receiver<notify::Result<Event>>>>,
+);
+
+type Tray = Option<Arc<Mutex<TrayItem>>>;
+
+struct App {
+    path: Box<Path>,
+    tray: Tray,
+    watcher: Option<RecommendedWatcher>,
+    tray_channel: TrayChanel,
+    watcher_channel: WatcherChanel,
 }
 
-fn daemon() {
-    // Instantiate a tray item with a title and an icon
-    let mut tray = TrayItem::new(
-        "Invoices",
-        IconSource::Resource("name-of-icon-in-rc-file"),
-    )
-        .unwrap();
+impl App {
+    pub fn new(path: Box<Path>) -> Self {
+        let tray_channel = mpsc::channel();
+        let watcher_channel = mpsc::channel();
 
-    // Add a label to the tray item
-    tray.add_label("Invoices").unwrap();
+        Self {
+            path,
+            tray: None,
+            watcher: None,
+            tray_channel: (tray_channel.0, Arc::new(Mutex::new(tray_channel.1))),
+            watcher_channel: (watcher_channel.0, Arc::new(Mutex::new(watcher_channel.1))),
+        }
+    }
 
-    // Add a separator to the tray label
-    tray.inner_mut().add_separator().unwrap();
+    pub fn run(&mut self) -> notify::Result<()> {
+        self.initialize_tray()?;
+        self.initialize_watcher()?;
+        self.listen_events();
+        Ok(())
+    }
 
-    let (tx, rx) = mpsc::sync_channel(1);
+    fn initialize_tray(&mut self) -> notify::Result<()> {
+        let mut tray = TrayItem::new("Invoices", IconSource::Resource("icon-green")).unwrap();
 
+        let (tx, _) = &self.tray_channel;
 
-    let quit_tx = tx.clone();
-    tray.add_menu_item("Quit", move || {
-        quit_tx.send(Message::Quit).unwrap();
-    })
-        .unwrap();
+        let tray_sender = tx;
 
-    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-        match res {
-            Ok(res) => {
+        // Add a label to the tray item
+        tray.add_label("Invoices").unwrap();
+
+        // Add a separator to the tray label
+        tray.inner_mut().add_separator().unwrap();
+
+        let mut tx_tap = tray_sender.clone();
+        let cb = move || tx_tap.send("tap").unwrap();
+        tray.add_menu_item("Tap", cb).unwrap();
+
+        let mut tx_quit = tray_sender.clone();
+        let cb = move || tx_quit.send("quit").unwrap();
+        tray.add_menu_item("Quit", cb).unwrap();
+
+        self.tray = Some(Arc::new(Mutex::new(tray)));
+
+        Ok(())
+    }
+
+    fn initialize_watcher(&mut self) -> notify::Result<()> {
+        let sender = &self.watcher_channel.0;
+
+        // Automatically select the best implementation for your platform.
+        // You can also access each implementation directly e.g. INotifyWatcher.
+        let mut watcher = RecommendedWatcher::new(sender.clone(), Config::default())?;
+
+        let path = self.path.as_ref().to_owned();
+        watcher.watch(&path, RecursiveMode::Recursive).unwrap();
+
+        self.watcher = Some(watcher);
+
+        Ok(())
+    }
+
+    fn listen_events(&mut self) {
+        println!("Listening events");
+        let tray_channel = Arc::clone(&self.tray_channel.1);
+        let watcher_channel = Arc::clone(&self.watcher_channel.1);
+        let tray = self.tray.clone().unwrap();
+
+        // Tray thread
+        let tray_handle = thread::spawn(move || {
+            let tray_channel = tray_channel.lock().unwrap();
+            // Obtener el canal del Arc y bloquearlo
+
+            loop {
+                let event = (*tray_channel).recv().unwrap();
+                println!("tray event: {:?}", event);
+
+                if event == "quit" {
+                    process::exit(0);
+                }
+            }
+        });
+
+        // Watcher thread
+        let watcher_handle = thread::spawn(move || {
+            let mut tray = tray.lock().unwrap();
+            let watcher_channel = watcher_channel.lock().unwrap();
+
+            loop {
+                let event = watcher_channel.recv().unwrap();
+
+                let res = event.unwrap();
+
                 match res.kind {
                     Create(CreateKind::Any) => {
-                        let path = res.paths.first().unwrap();
+                        tray.set_icon(IconSource::Resource("icon-red")).unwrap_or_else(|err| {
+                            eprintln!("Error al cambiar el icono: {:?}", err);
+                        });
 
+                        let path = match res.paths.first() {
+                            Some(path) => path,
+                            None => {
+                                eprintln!("No se encontró ningún camino en el evento");
+                                continue; // Continuar con la próxima iteración del bucle
+                            }
+                        };
 
-                        let file_attrs = std::fs::metadata(path).unwrap();
+                        let file_attrs = match std::fs::metadata(path) {
+                            Ok(attrs) => attrs,
+                            Err(err) => {
+                                eprintln!("Error al obtener los metadatos del archivo: {:?}", err);
+                                continue; // Continuar con la próxima iteración del bucle
+                            }
+                        };
 
                         if file_attrs.is_dir() {
-                            return;
+                            continue;
                         }
 
                         // rename file to format YYYY-MM using current date
+                        thread::sleep(Duration::from_secs(5));
 
-                        thread::sleep(Duration::from_secs(1));
-
-                        println!("file created: {:?}", file_attrs);
+                        println!("File created: {:?}", file_attrs);
 
                         let date = chrono::Local::now().format("%Y-%m");
                         println!("current date is {}", date);
@@ -66,41 +161,45 @@ fn daemon() {
 
                         let new_path = path.parent().unwrap().join(new_name);
 
-                        println!("new name is {:?}", new_path);
+                        println!("El nuevo nombre es {:?}", new_path);
 
-                        std::fs::rename(path, new_path).unwrap();
+                        match std::fs::rename(path, new_path) {
+                            Ok(_) => {}
+                            Err(err) => eprintln!("Error al renombrar el archivo: {:?}", err),
+                        }
+
+                        tray.set_icon(IconSource::Resource("icon-green"))
+                            .expect("Error al cambiar el icono");
                     }
-                    _ => {}
+                    _ => {
+                        // println!("No event match {:#?}", res.kind);
+                    }
                 }
             }
-            Err(e) => {},
-        }
-    }).unwrap();
+        });
 
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(Path::new("C:\\Users\\styve\\My Drive\\1 - Finanzas"), RecursiveMode::Recursive).unwrap();
+        tray_handle.join().unwrap_or_else(|err| {
+            println!("Error tray_handle: {:?}", err);
+        });
 
-    loop {
-        match rx.recv() {
-            Ok(Message::Quit) => {
-                println!("Quit");
-                break;
-            }
-            _ => {}
-        }
+        watcher_handle.join().unwrap_or_else(|err| {
+            println!("Error watcher_handle: {:?}", err);
+        });
+
+        println!("Listening tray events end fn")
     }
 }
 
-fn main() {
-    unsafe {
-        AttachConsole(ATTACH_PARENT_PROCESS);
-    }
+fn main() -> notify::Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    // It hides the console window
-    unsafe {
-        FreeConsole();
-    }
+    let path = Path::new("C:\\Users\\styve\\My Drive\\1 - Finanzas");
 
-    daemon();
+    log::info!("Watching {path}", path = path.display());
+
+    let mut app = App::new(Box::from(path));
+
+    app.run().unwrap();
+
+    Ok(())
 }
