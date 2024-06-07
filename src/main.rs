@@ -123,9 +123,10 @@ impl App {
 
                 match res.kind {
                     Create(CreateKind::Any) => {
-                        tray.set_icon(IconSource::Resource("icon-red")).unwrap_or_else(|err| {
-                            eprintln!("Error al cambiar el icono: {:?}", err);
-                        });
+                        tray.set_icon(IconSource::Resource("icon-red"))
+                            .unwrap_or_else(|err| {
+                                eprintln!("Error al cambiar el icono: {:?}", err);
+                            });
 
                         let path = match res.paths.first() {
                             Some(path) => path,
