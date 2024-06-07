@@ -187,7 +187,7 @@ impl App {
             println!("Error watcher_handle: {:?}", err);
         });
 
-        println!("Listening tray events end fn")
+        println!("Listening events ended")
     }
 }
 
