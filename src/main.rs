@@ -10,14 +10,9 @@ use std::time::Duration;
 use std::{process, thread};
 use tray_item::{IconSource, TrayItem};
 
-type TrayChanel = (
-    mpsc::Sender<&'static str>,
-    Arc<Mutex<mpsc::Receiver<&'static str>>>,
-);
-
-type WatcherChanel = (
-    mpsc::Sender<notify::Result<Event>>,
-    Arc<Mutex<mpsc::Receiver<notify::Result<Event>>>>,
+type Channel<T> = (
+    mpsc::Sender<T>,
+    Arc<Mutex<mpsc::Receiver<T>>>,
 );
 
 type Tray = Option<Arc<Mutex<TrayItem>>>;
@@ -26,8 +21,8 @@ struct App {
     path: Box<Path>,
     tray: Tray,
     watcher: Option<RecommendedWatcher>,
-    tray_channel: TrayChanel,
-    watcher_channel: WatcherChanel,
+    tray_channel: Channel<&'static str>,
+    watcher_channel: Channel<notify::Result<Event>>
 }
 
 impl App {
