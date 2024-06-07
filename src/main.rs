@@ -93,7 +93,7 @@ impl App {
             // Obtener el canal del Arc y bloquearlo
 
             loop {
-                let event = (*tray_channel).recv().unwrap();
+                let event = tray_channel.recv().unwrap();
                 println!("tray event: {:?}", event);
 
                 if event == "quit" {
