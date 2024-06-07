@@ -1,9 +1,8 @@
 #![windows_subsystem = "windows"]
 
-use notify::event::{CreateKind, ModifyKind, RenameMode};
-use notify::EventKind::{Create, Modify};
+use notify::event::{CreateKind};
+use notify::EventKind::{Create};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
-use std::fmt::Error;
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
@@ -56,11 +55,11 @@ impl App {
         // Add a separator to the tray label
         tray.inner_mut().add_separator().unwrap();
 
-        let mut tx_tap = tray_sender.clone();
+        let tx_tap = tray_sender.clone();
         let cb = move || tx_tap.send("tap").unwrap();
         tray.add_menu_item("Tap", cb).unwrap();
 
-        let mut tx_quit = tray_sender.clone();
+        let tx_quit = tray_sender.clone();
         let cb = move || tx_quit.send("quit").unwrap();
         tray.add_menu_item("Quit", cb).unwrap();
 
