@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
-use notify::event::{CreateKind};
-use notify::EventKind::{Create};
+use notify::event::CreateKind;
+use notify::EventKind::Create;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
@@ -47,19 +47,17 @@ impl App {
 
         let (tx, _) = &self.tray_channel;
 
-        let tray_sender = tx;
-
         // Add a label to the tray item
         tray.add_label("Invoices").unwrap();
 
         // Add a separator to the tray label
         tray.inner_mut().add_separator().unwrap();
 
-        let tx_tap = tray_sender.clone();
+        let tx_tap = tx.clone();
         let cb = move || tx_tap.send("tap").unwrap();
         tray.add_menu_item("Tap", cb).unwrap();
 
-        let tx_quit = tray_sender.clone();
+        let tx_quit = tx.clone();
         let cb = move || tx_quit.send("quit").unwrap();
         tray.add_menu_item("Quit", cb).unwrap();
 
@@ -85,8 +83,8 @@ impl App {
 
     fn listen_events(&mut self) {
         println!("Listening events");
-        let tray_channel = Arc::clone(&self.tray_channel.1);
-        let watcher_channel = Arc::clone(&self.watcher_channel.1);
+        let tray_channel = self.tray_channel.1.clone();
+        let watcher_channel = self.watcher_channel.1.clone();
         let tray = self.tray.clone().unwrap();
 
         // Tray thread
