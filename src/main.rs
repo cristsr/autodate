@@ -108,9 +108,7 @@ impl App {
             let watcher_channel = watcher_channel.lock().unwrap();
 
             loop {
-                let event = watcher_channel.recv().unwrap();
-
-                let res = event.unwrap();
+                let res = watcher_channel.recv().unwrap().unwrap();
 
                 match res.kind {
                     Create(CreateKind::Any) => {
