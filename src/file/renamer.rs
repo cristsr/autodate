@@ -1,5 +1,6 @@
 use crate::file::config::FileRenamerConfig;
 
+use crate::config::AppConfig;
 use chrono::Local;
 use std::iter;
 use std::path::{Path, PathBuf};
@@ -23,11 +24,11 @@ pub enum RenameError {
 }
 
 pub struct FileRenamer {
-    config: FileRenamerConfig,
+    config: AppConfig,
 }
 
 impl FileRenamer {
-    pub fn new(config: FileRenamerConfig) -> Self {
+    pub fn new(config: AppConfig) -> Self {
         Self { config }
     }
 
@@ -44,7 +45,7 @@ impl FileRenamer {
             .ok_or(RenameError::NoExtension)?;
 
         // Generate new filename with current date
-        let date = Local::now().format(&self.config.date_format);
+        let date = Local::now().format(&self.config.file_format);
 
         let new_path = iter::once(format!("{}.{}", date, extension))
             .chain((1..).map(|n| format!("{} ({}).{}", date, n, extension)))
@@ -60,12 +61,5 @@ impl FileRenamer {
         log::info!("File renamed successfully to: {}", new_path.display());
 
         Ok(new_path)
-    }
-}
-
-impl Default for FileRenamer {
-    fn default() -> Self {
-        let config = FileRenamerConfig::default();
-        Self::new(config)
     }
 }

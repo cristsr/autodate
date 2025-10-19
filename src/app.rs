@@ -26,8 +26,10 @@ impl App {
     }
 
     pub fn listen_files(&mut self) -> &mut Self {
+        let config = self.config.clone();
+
         self.file_watcher.listen(move |path| {
-            let file_renamer = FileRenamer::default();
+            let file_renamer = FileRenamer::new((*config).clone());
 
             match file_renamer.rename_file(&path) {
                 Ok(new_path) => {
