@@ -54,11 +54,6 @@ impl FileRenamer {
 
         log::debug!("New filename will be: {}", new_path.display());
 
-        let new_path = path
-            .parent()
-            .ok_or(RenameError::NoParentDirectory)?
-            .join(new_path);
-
         // Perform the rename
         std::fs::rename(path, &new_path)?;
 
