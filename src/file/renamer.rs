@@ -1,5 +1,5 @@
 use crate::config::AppConfig;
-use chrono::Local;
+use chrono::{Local, NaiveDate};
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -8,6 +8,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RenameError {
+    #[error("File has no stem")]
+    NoStem,
+
     #[error("File has no extension")]
     NoExtension,
 
@@ -31,19 +34,27 @@ impl FileRenamer {
     }
 
     pub fn rename_file(&self, path: &Path) -> Result<PathBuf, RenameError> {
-        log::info!("Starting rename process for: {}", path.display());
-
         thread::sleep(Duration::from_secs(self.config.delay_seconds));
 
+        // Generate new filename with current date
         let parent = path.parent().ok_or(RenameError::NoParentDirectory)?;
+
+        let date = Local::now().format(&self.config.file_format);
+
+        let stem = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .ok_or(RenameError::NoStem)?;
 
         let extension = path
             .extension()
             .and_then(|ext| ext.to_str())
             .ok_or(RenameError::NoExtension)?;
 
-        // Generate new filename with current date
-        let date = Local::now().format(&self.config.file_format);
+        if NaiveDate::parse_from_str(stem, &self.config.file_format).is_ok() {
+            log::info!("File already has a valid date in the name, skipping");
+            return Ok(path.to_path_buf());
+        }
 
         let new_path = iter::once(format!("{}.{}", date, extension))
             .chain((1..).map(|n| format!("{} ({}).{}", date, n, extension)))
@@ -51,9 +62,7 @@ impl FileRenamer {
             .find(|path| !path.exists())
             .ok_or(RenameError::NoAvailableFilename)?;
 
-        log::debug!("New filename will be: {}", new_path.display());
-
-        // Perform the rename
+        // Rename file
         std::fs::rename(path, &new_path)?;
 
         log::info!("File renamed successfully to: {}", new_path.display());

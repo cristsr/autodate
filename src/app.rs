@@ -29,15 +29,8 @@ impl App {
         let config = self.config.clone();
 
         self.file_watcher.listen(move |path| {
-            let file_renamer = FileRenamer::new((*config).clone());
-
-            match file_renamer.rename_file(&path) {
-                Ok(new_path) => {
-                    log::info!("File renamed successfully: {}", new_path.display());
-                }
-                Err(err) => {
-                    log::error!("Failed to rename file {}: {}", path.display(), err);
-                }
+            if let Err(err) = FileRenamer::new((*config).clone()).rename_file(&path) {
+                log::error!("Failed to rename file {}: {}", path.display(), err);
             }
         });
 

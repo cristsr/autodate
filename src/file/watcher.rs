@@ -73,6 +73,7 @@ impl FileWatcher {
                 };
 
                 if !metadata.is_file() {
+                    log::debug!("Ignoring directory: {}", path.display());
                     continue;
                 }
 
@@ -119,10 +120,8 @@ fn get_file_metadata(path: &Path) -> Option<Metadata> {
     match metadata(path) {
         Ok(metadata) => {
             if metadata.is_file() {
-                log::debug!("File detected: {}", path.display());
                 Some(metadata)
             } else {
-                log::debug!("Ignoring directory: {}", path.display());
                 None
             }
         }
