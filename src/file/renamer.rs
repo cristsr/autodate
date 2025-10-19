@@ -1,32 +1,25 @@
 use crate::file::config::FileRenamerConfig;
+
 use chrono::Local;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum RenameError {
+    #[error("File has no extension")]
     NoExtension,
+
+    #[error("File has no parent directory")]
     NoParentDirectory,
-    IoError(std::io::Error),
-}
 
-impl std::fmt::Display for RenameError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RenameError::NoExtension => write!(f, "File has no extension"),
-            RenameError::NoParentDirectory => write!(f, "File has no parent directory"),
-            RenameError::IoError(err) => write!(f, "I/O error: {}", err),
-        }
-    }
-}
+    #[error("I/O error")]
+    IoError(#[from] std::io::Error),
 
-impl std::error::Error for RenameError {}
-
-impl From<std::io::Error> for RenameError {
-    fn from(err: std::io::Error) -> Self {
-        RenameError::IoError(err)
-    }
+    #[error("Could not find available filename")]
+    NoAvailableFilename,
 }
 
 pub struct FileRenamer {
@@ -41,16 +34,10 @@ impl FileRenamer {
     pub fn rename_file(&self, path: &Path) -> Result<PathBuf, RenameError> {
         log::info!("Starting rename process for: {}", path.display());
 
-        // Wait before renaming to ensure file is fully written
-        if self.config.delay_seconds > 0 {
-            log::debug!(
-                "Waiting {} seconds before rename",
-                self.config.delay_seconds
-            );
-            thread::sleep(Duration::from_secs(self.config.delay_seconds));
-        }
+        thread::sleep(Duration::from_secs(self.config.delay_seconds));
 
-        // Get the file extension
+        let parent = path.parent().ok_or(RenameError::NoParentDirectory)?;
+
         let extension = path
             .extension()
             .and_then(|ext| ext.to_str())
@@ -58,20 +45,24 @@ impl FileRenamer {
 
         // Generate new filename with current date
         let date = Local::now().format(&self.config.date_format);
-        let new_filename = format!("{}.{}", date, extension);
 
-        log::debug!("New filename will be: {}", new_filename);
+        let new_path = iter::once(format!("{}.{}", date, extension))
+            .chain((1..).map(|n| format!("{} ({}).{}", date, n, extension)))
+            .map(|filename| parent.join(filename))
+            .find(|path| !path.exists())
+            .ok_or(RenameError::NoAvailableFilename)?;
 
-        // Get the parent directory
-        let parent = path.parent().ok_or(RenameError::NoParentDirectory)?;
-        let new_path = parent.join(new_filename);
+        log::debug!("New filename will be: {}", new_path.display());
 
-        log::info!("Renaming {} to {}", path.display(), new_path.display());
+        let new_path = path
+            .parent()
+            .ok_or(RenameError::NoParentDirectory)?
+            .join(new_path);
 
         // Perform the rename
         std::fs::rename(path, &new_path)?;
 
-        log::info!("File renamed successfully");
+        log::info!("File renamed successfully to: {}", new_path.display());
 
         Ok(new_path)
     }

@@ -11,8 +11,3 @@ impl Default for FileRenamerConfig {
         }
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct FileWatcherConfig {
-    pub path: String,
-}

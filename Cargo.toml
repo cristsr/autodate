@@ -1,9 +1,8 @@
 [package]
-name = "invoices-name"
-version = "0.1.0"
-edition = "2021"
+name = "autodate"
+version = "0.1.2"
+edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 notify = "8.2.0"
 env_logger = "0.11.3"
@@ -12,6 +11,10 @@ chrono = "0.4.38"
 tray-icon = "0.21.1"
 winit = "0.30.12"
 open = "5.3"
+thiserror = "2.0.17"
+dotenvy = "0.15.7"
+envy = "0.4.2"
+serde = { version = "1.0.228", features = ["derive"] }
 
 [build-dependencies]
 embed-resource = "2.3"

@@ -1,46 +1,28 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WatcherControl {
-    Pause,
-    Resume,
-    Stop,
+#[derive(Debug)]
+pub struct WatcherHandler {
+    pause: AtomicBool,
 }
 
-#[derive(Debug, Clone)]
-pub struct WatcherHandle {
-    pub receiver: Arc<Mutex<Receiver<WatcherControl>>>,
-    sender: Sender<WatcherControl>,
-}
-
-impl WatcherHandle {
+impl WatcherHandler {
     pub fn pause(&self) {
-        if let Err(err) = self.sender.send(WatcherControl::Pause) {
-            log::error!("Failed to send pause command: {}", err);
-        }
+        self.pause.store(true, Ordering::Relaxed);
     }
 
     pub fn resume(&self) {
-        if let Err(err) = self.sender.send(WatcherControl::Resume) {
-            log::error!("Failed to send resume command: {}", err);
-        }
+        self.pause.store(false, Ordering::Relaxed);
     }
 
-    pub fn stop(&self) {
-        if let Err(err) = self.sender.send(WatcherControl::Stop) {
-            log::error!("Failed to send stop command: {}", err);
-        }
+    pub fn is_paused(&self) -> bool {
+        self.pause.load(Ordering::Relaxed)
     }
 }
 
-impl Default for WatcherHandle {
+impl Default for WatcherHandler {
     fn default() -> Self {
-        let (sender, receiver) = channel();
-
         Self {
-            sender,
-            receiver: Arc::new(Mutex::new(receiver)),
+            pause: AtomicBool::new(false),
         }
     }
 }

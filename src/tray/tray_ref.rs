@@ -1,67 +1,70 @@
+use crate::tray::constants::{ICON_GREEN, ICON_RED, MENU_DISABLED, MENU_RUNNING, MENU_TITLE};
+use crate::tray::events::TrayEvent;
 use crate::tray::item_builder::{TrayItemBuilder, TrayMenuItemType};
 use crate::tray::menu::TrayMenu;
-use crate::tray::tray::{Tray, TrayIcons};
-use crate::tray::types::TrayEvent;
-use std::sync::{Arc, Mutex};
+use crate::tray::tray::Tray;
+
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex, atomic};
 use tray_icon::menu::MenuId;
 
 pub struct TrayRef {
-    pub running: Arc<Mutex<bool>>,
+    pub running: AtomicBool,
     pub tray: Arc<Mutex<Tray>>,
     pub tray_menu: Arc<Mutex<TrayMenu>>,
 }
 
 impl TrayRef {
-    pub fn new(
-        running: Arc<Mutex<bool>>,
-        tray: Arc<Mutex<Tray>>,
-        tray_menu: Arc<Mutex<TrayMenu>>,
-    ) -> Self {
+    pub fn new(tray: Arc<Mutex<Tray>>, tray_menu: Arc<Mutex<TrayMenu>>) -> Self {
         Self {
-            running,
+            running: AtomicBool::new(true),
             tray,
             tray_menu,
         }
     }
 
-    pub fn toggle_running(&self) -> (String, bool) {
-        let mut current = self.running.lock().unwrap();
-        *current = !*current;
-
-        let title = match *current {
-            true => "Running".to_string(),
-            false => "Disabled (Click to re-enable)".to_string(),
-        };
-
-        (title, *current)
+    pub fn toggle_running(&self) -> bool {
+        let next_value = !self.is_running();
+        self.set_running(next_value);
+        next_value
     }
 
     pub fn update_menu(&mut self) {
-        let (title, checked) = self.toggle_running();
+        let is_running = self.toggle_running();
 
-        log::debug!("Updating running state: {}", title);
+        let (title, icon) = if is_running {
+            (MENU_RUNNING, ICON_GREEN)
+        } else {
+            (MENU_DISABLED, ICON_RED)
+        };
+
+        self.tray_menu.lock().unwrap().update_item(
+            TrayItemBuilder::new()
+                .with_id(MenuId::new(TrayEvent::Title.as_str()))
+                .with_title(MENU_TITLE)
+                .with_icon(icon)
+                .build(TrayMenuItemType::Icon),
+        );
 
         self.tray_menu.lock().unwrap().update_item(
             TrayItemBuilder::new()
                 .with_id(MenuId::new(TrayEvent::Running.as_str()))
-                .with_title(&title)
-                .with_checked(checked)
+                .with_title(title)
+                .with_checked(is_running)
                 .build(TrayMenuItemType::Check),
         );
 
-        {
-            let menu = self.tray_menu.lock().unwrap();
-            self.tray.lock().unwrap().set_menu(&*menu);
-        }
+        let menu = self.tray_menu.lock().unwrap();
+        self.tray.lock().unwrap().set_menu(&*menu);
 
-        // Actualizar ícono
-        self.tray.lock().unwrap().set_icon(match checked {
-            true => TrayIcons::GREEN,
-            false => TrayIcons::RED,
-        });
+        self.tray.lock().unwrap().set_icon(icon);
     }
 
     pub fn is_running(&self) -> bool {
-        *self.running.lock().unwrap()
+        self.running.load(atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_running(&self, running: bool) {
+        self.running.store(running, atomic::Ordering::Relaxed);
     }
 }

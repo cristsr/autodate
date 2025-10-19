@@ -1,7 +1,7 @@
+use crate::tray::events::TrayEvent;
 use crate::tray::menu::TrayMenu;
 use crate::tray::tray::Tray;
 use crate::tray::tray_ref::TrayRef;
-use crate::tray::types::TrayEvent;
 use std::sync::{Arc, Mutex};
 use tray_icon::menu::MenuEvent;
 use winit::event::Event;
@@ -15,7 +15,6 @@ pub enum UserEvent {
 pub struct TrayRunner {
     tray: Arc<Mutex<Tray>>,
     menu: Arc<Mutex<TrayMenu>>,
-    running: Arc<Mutex<bool>>,
 }
 
 impl TrayRunner {
@@ -23,7 +22,6 @@ impl TrayRunner {
         Self {
             tray: Arc::new(Mutex::new(tray)),
             menu: Arc::new(Mutex::new(menu)),
-            running: Arc::new(Mutex::new(true)),
         }
     }
 
@@ -35,14 +33,16 @@ impl TrayRunner {
             .run(move |event, ael| {
                 ael.set_control_flow(ControlFlow::Wait);
 
-                match event {
-                    Event::UserEvent(UserEvent::MenuEvent(e)) => {
-                        log::debug!("Menu event: {:?}", e);
-                        let tray_event = TrayEvent::from(e.id.as_ref());
-                        Self::event_listener(tray_event.clone(), &mut tray_ref);
-                        callback(tray_event.clone(), &mut tray_ref);
+                if let Event::UserEvent(UserEvent::MenuEvent(e)) = event {
+                    let tray_event = TrayEvent::from(e.id.as_ref());
+
+                    match tray_event {
+                        TrayEvent::Title => {}
+                        TrayEvent::Running => tray_ref.update_menu(),
+                        TrayEvent::Exit => ael.exit(),
                     }
-                    _ => {}
+
+                    callback(tray_event.clone(), &mut tray_ref);
                 }
             })
             .unwrap();
@@ -61,13 +61,6 @@ impl TrayRunner {
     }
 
     fn get_ref(&self) -> TrayRef {
-        TrayRef::new(self.running.clone(), self.tray.clone(), self.menu.clone())
-    }
-
-    fn event_listener(event: TrayEvent, tray_ref: &mut TrayRef) {
-        match event {
-            TrayEvent::Running => tray_ref.update_menu(),
-            _ => {}
-        }
+        TrayRef::new(self.tray.clone(), self.menu.clone())
     }
 }
