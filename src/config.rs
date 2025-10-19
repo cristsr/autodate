@@ -4,8 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Clone, Debug, Deserialize)]
 pub enum AppConfigError {
-    #[error("Failed to load configuration {msg:?}")]
-    LoadError { msg: String },
+    #[error("Failed to load configuration {0:?}")]
+    LoadError(String),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -18,9 +18,7 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn new() -> AppConfig {
         envy::from_env::<AppConfig>()
-            .map_err(|err| AppConfigError::LoadError {
-                msg: err.to_string(),
-            })
+            .map_err(|err| AppConfigError::LoadError(err.to_string()))
             .unwrap_or_else(|err| {
                 show_error(err);
                 std::process::exit(1);
