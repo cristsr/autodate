@@ -12,6 +12,7 @@ pub enum AppConfigError {
 pub struct AppConfig {
     pub watch_path: String,
     pub file_format: String,
+    pub date_validation: String,
     pub delay_seconds: u64,
 }
 

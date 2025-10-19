@@ -1,5 +1,6 @@
 use crate::config::AppConfig;
-use chrono::{Local, NaiveDate};
+use chrono::Local;
+use regex::Regex;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -22,6 +23,9 @@ pub enum RenameError {
 
     #[error("Could not find available filename")]
     NoAvailableFilename,
+
+    #[error("Invalid date format")]
+    InvalidDateFormat,
 }
 
 pub struct FileRenamer {
@@ -51,7 +55,11 @@ impl FileRenamer {
             .and_then(|ext| ext.to_str())
             .ok_or(RenameError::NoExtension)?;
 
-        if NaiveDate::parse_from_str(stem, &self.config.file_format).is_ok() {
+        let is_valid_name = Regex::new(&self.config.date_validation)
+            .map_err(|_| RenameError::InvalidDateFormat)?
+            .is_match(stem);
+
+        if is_valid_name {
             log::info!("File already has a valid date in the name, skipping");
             return Ok(path.to_path_buf());
         }

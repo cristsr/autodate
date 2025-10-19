@@ -57,6 +57,15 @@ WATCH_PATH=C:\\Users\\YourUser\\Documents\\Invoices
 #   %Y%m%d      -> 20251019
 FILE_FORMAT=%Y-%m
 
+# Required: Regex pattern to validate if a file already has a valid date in its name
+# Files matching this pattern will be skipped (not renamed)
+# Examples:
+#   ^\d{4}-(0[1-9]|1[0-2])$              -> Matches YYYY-MM format (2025-10)
+#   ^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$  -> Matches YYYY-MM-DD format
+#   ^\d{8}$                              -> Matches YYYYMMDD format (20251019)
+# Note: Do not use quotes around the regex pattern
+DATE_VALIDATION=^\d{4}-(0[1-9]|1[0-2])$
+
 # Required: Delay in seconds before renaming a file (allows file to finish writing)
 DELAY_SECONDS=5
 ```
