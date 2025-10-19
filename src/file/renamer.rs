@@ -1,5 +1,3 @@
-use crate::file::config::FileRenamerConfig;
-
 use crate::config::AppConfig;
 use chrono::Local;
 use std::iter;
