@@ -6,7 +6,7 @@ mod file;
 mod tray;
 
 use crate::app::App;
-use crate::config::{AppConfig, AppConfigError};
+use crate::config::AppConfig;
 
 fn main() {
     dotenvy::dotenv().ok();
