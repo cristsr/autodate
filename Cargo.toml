@@ -15,12 +15,7 @@ thiserror = "2.0.17"
 dotenvy = "0.15.7"
 envy = "0.4.2"
 serde = { version = "1.0.228", features = ["derive"] }
+native-dialog = "0.9.2"
 
 [build-dependencies]
 embed-resource = "2.3"
-
-[profile.dev.package.metadata.win]
-subsystem = "console"
-
-[profile.release.package.metadata.win]
-subsystem = "windows"
